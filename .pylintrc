@@ -1,0 +1,5 @@
+[MAIN]
+max-line-length=150
+
+[MESSAGES CONTROL]
+disable=too-few-public-methods

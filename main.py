@@ -29,12 +29,12 @@ from concurrent.futures import ThreadPoolExecutor
 import sys
 import asyncio
 
+import capture2go as c2g
+import science_mode_4 as sm4
+
 from vector import Vector
 from quaternion import Quaternion
 from algorithm import Algorithm
-
-import capture2go as c2g
-import science_mode_4 as sm4
 
 
 class Example:

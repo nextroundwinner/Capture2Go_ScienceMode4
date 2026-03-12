@@ -9,15 +9,15 @@ For Capture2Go device:
 - Set measurement mode
 - Start streaming
 - Processing data
-  - Calculate inclination from accelerometer values (angle between gravity and z-axis)
-  - Derive current and channel count from inclination
+  - Calculate angle of cyclic movement from gyro and orientation
+  - Derive current and channel count from angle
 - Stop streaming
 - Disconnect
 
 For P24 device:
 - Connect to device
 - Initialize mid level mode
-- Update stimulation parameters accoring current based on imu inclination
+- Update stimulation parameters accoring current angle of cyclic movement
 - Stop stimulation
 - Disconnect
 
@@ -26,9 +26,12 @@ Example runs until enter key is pressed
 
 
 from concurrent.futures import ThreadPoolExecutor
-import math
 import sys
 import asyncio
+
+from vector import Vector
+from quaternion import Quaternion
+from algorithm import Algorithm
 
 import capture2go as c2g
 import science_mode_4 as sm4
@@ -49,26 +52,14 @@ class Example:
         self._current = 10.0
         self._channel_count = 1
 
+        self._algorithm = Algorithm(50)
+
 
     async def main(self):
         """Main function to run example"""
         await asyncio.gather(asyncio.create_task(self._handle_stimulator()),
                             asyncio.create_task(self._handle_sensor()),
                             asyncio.create_task(self._handle_keyboard_input()))
-
-
-    @staticmethod
-    def _inclination_from_acc(ax: float, ay: float, az: float) -> float:
-        """Calculates inclination relative to gravity as single angle"""
-        g = math.sqrt(ax**2 + ay**2 + az**2)
-        if g < 1e-8:
-            return 0.0
-        # Angle between gravity vector and sensor z-axis
-        cos_theta = abs(az) / g
-        # Clamp due to possible numerical noise
-        cos_theta = max(-1.0, min(1.0, cos_theta))
-        theta = math.acos(cos_theta) # radians
-        return math.degrees(theta) # degrees
 
 
     async def _handle_stimulator(self):
@@ -82,6 +73,7 @@ class Example:
             await mid_level.update([cc1] * self._channel_count)
 
 
+        return
         # disable ScienceMode logging
         sm4.logger().disabled = True
         # create serial port connection
@@ -149,17 +141,18 @@ class Example:
                 break
 
             parsed = package.parse()
-            if 'acc' in parsed:
-                acc = parsed['acc']
-                inclination = 0
-                for x in acc:
-                    inclination += Example._inclination_from_acc(x[0], x[1], x[2])
-                inclination /= len(acc)
-                # inclination ranges from 0° to 90°
-                # self._current = 10 + inclination * 0.75
-                self._channel_count = round(inclination / 15) + 1
-                # print(f"Inclination: {round(inclination, 2)}, stimulation current {round(self._current, 2)}, channel count {self._channel_count}")
-                print(f"{acc[-1]} - {inclination}")
+            if 'gyr' in parsed and 'quat' in parsed:
+                gyr = parsed['gyr']
+                quat = parsed['quat']
+                # rest = parsed['restDetected']
+                sample_count = len(gyr)
+                for x in range(sample_count):
+                    gyr_sample = Vector(gyr[x][0], gyr[x][1], gyr[x][2])
+                    quat_sample = Quaternion(quat[x][0], quat[x][1],
+                                             quat[x][2], quat[x][3])
+                    angle = self._algorithm.update_state(gyr_sample, quat_sample)
+                    # ToDo: adjust stimulation parameters based on angle
+
 
         await imu.send(c2g.pkg.CmdStopStreaming())
         # wait until sensor has really stopped sending data

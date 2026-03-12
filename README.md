@@ -1,4 +1,4 @@
-# ScienceMode4 Python Integration with Capture2Go imu
+# Example how to use Capture2Go imu with ScienceMode4 python lib
 
 ## Introduction
 
@@ -24,7 +24,9 @@ For P24 device:
 - Stop stimulation
 - Disconnect
 
+Sensor must be attached to the bicycle crank to have enough rotation around the sensor itself
 
 ## Hints
 - Adjust name/port for both devices depending on your setup
+- run main.py
 - Example runs until enter key is pressed

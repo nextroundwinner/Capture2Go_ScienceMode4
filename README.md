@@ -12,8 +12,7 @@ For Capture2Go device:
 - Set measurement mode
 - Start streaming
 - Processing data
-  - Calculate angle of cyclic movement from gyro and orientation
-  - Derive current and channel count from angle
+  - Calculate angle of cyclic movement
 - Stop streaming
 - Disconnect
 
@@ -28,6 +27,5 @@ This examples expects a cyclic movement of the imu. The sensor must be attached 
 bicycle crank to have enough rotation around the sensor itself.
 
 ## Hints
-- Adjust name/port for both devices depending on your setup
-- run main.py
-- Example runs until enter key is pressed
+- Adjust command line parameters name/port for both devices depending on your setup
+- run live_plot_example.py

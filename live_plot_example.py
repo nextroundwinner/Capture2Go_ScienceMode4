@@ -140,7 +140,7 @@ class ImuDataPlot:
             ax.grid()
 
 
-    def update_plot(self):
+    def update_plot(self, frame): # pylint:disable=unused-argument
         """Update plot with new imu values"""
         # Read IMU data from the queue.
         while True:
@@ -270,22 +270,35 @@ def main():
     plot = ImuDataPlot()
     stim = Stimulator(args.sciencemode_device)
 
-    imu_loop = asyncio.new_event_loop()
-    imu_thread = threading.Thread(target=imu_loop.run_until_complete, args=(get_imu_data(args.imu_device, plot.queue, stim.queue),), daemon=True)
-    imu_thread.start()
+    async def run_hardware_tasks():
+        try:
+            await asyncio.gather(
+                get_imu_data(args.imu_device, plot.queue, stim.queue),
+                stim.handle_communication()
+            )
+        except asyncio.CancelledError:
+            # Expected behavior during shutdown
+            pass
 
-    stim_loop = asyncio.new_event_loop()
-    stim_thread = threading.Thread(target=stim_loop.run_until_complete, args=(stim.handle_communication(),), daemon=True)
-    stim_thread.start()
+
+    def start_background_loop(loop):
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(run_hardware_tasks())
+
+
+    hw_loop = asyncio.new_event_loop()
+    hw_thread = threading.Thread(target=start_background_loop, args=(hw_loop,), daemon=True)
+    hw_thread.start()
 
     plt.show()
 
-    for task in asyncio.all_tasks(imu_loop):
-        task.cancel()
-    for task in asyncio.all_tasks(stim_loop):
-        task.cancel()
-    imu_thread.join()
-    stim_thread.join()
+    for task in asyncio.all_tasks(hw_loop):
+        hw_loop.call_soon_threadsafe(task.cancel)
+
+    # wait until devices are finished deinitializing
+    asyncio.sleep(2.0)
+
+    hw_thread.join(timeout=2.0)
 
 
 if __name__ == '__main__':

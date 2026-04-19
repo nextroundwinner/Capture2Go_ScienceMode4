@@ -2,8 +2,8 @@
 
 ## Introduction
 
-Provides an example how to use SensorStim Capture2Go sensor (https://www.capture2go.com)
-in combination with a Hasomed Science ScienceMode4 stimulator (https://github.com/ScienceMode).
+Provides an example how to use SensorStim Capture2Go sensor (https://www.capture2go.com, https://github.com/sensorstim/capture2go_sdk)
+in combination with a Hasomed Science ScienceMode4 stimulator (https://hasomedscience.de/, https://github.com/ScienceMode).
 
 This example uses data from a Capture2Go device to adjust stimulation parameters of P24.
 

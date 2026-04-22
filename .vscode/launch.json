@@ -9,6 +9,7 @@
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
+            // "program": "minimal_example.py",
             "program": "live_plot_example.py",
             "args": ["COM4", "COM3"], 
             "console": "integratedTerminal"

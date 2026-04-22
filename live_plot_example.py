@@ -29,10 +29,10 @@ import science_mode_4 as sm4
 @dataclass
 class ImuData:
     """DTO for imu measurement data"""
-    gyr: np.typing.NDArray[np.float64]
-    acc: np.typing.NDArray[np.float64]
-    mag: np.typing.NDArray[np.float64]
-    euler: np.typing.NDArray[np.float64]
+    gyr: np.typing.NDArray[np.float64] # 8x3
+    acc: np.typing.NDArray[np.float64] # 8x3
+    mag: np.typing.NDArray[np.float64] # 8x3
+    crank_angle: np.typing.NDArray[np.float64] # 8x1
 
 
 class Muscles(IntEnum):
@@ -59,17 +59,17 @@ async def get_imu_data(name: str, q_gui: queue.Queue[ImuData], q_stim: queue.Que
                 acc = parsed['acc']
                 mag = parsed['mag']
 
-                euler = np.zeros((8, 3))
+                crank_angle = np.zeros(8)
                 for i in range(8):
                     # euler[i] = np.rad2deg(c2g.utils.eulerAngles(parsed['quat9D'][i], 'zxy', True))
 
                     quat = parsed['quat'][i]
                     vec = c2g.utils.rotateinv(quat, np.array([0, 0, 1], float))
-                    crank_angle = np.atan2(vec[1], vec[0])
+                    crank_angle_tmp = np.atan2(vec[1], vec[0])
 
-                    euler[i] = [np.rad2deg(crank_angle), np.nan, np.nan]
+                    crank_angle[i] = np.rad2deg(crank_angle_tmp)
 
-                imu_data = ImuData(gyr, acc, mag, euler)
+                imu_data = ImuData(gyr, acc, mag, crank_angle)
                 q_gui.put(imu_data)
                 q_stim.put(imu_data)
             else:
@@ -78,6 +78,8 @@ async def get_imu_data(name: str, q_gui: queue.Queue[ImuData], q_stim: queue.Que
     except asyncio.CancelledError:
         print('Stopping streaming.')
         await imu.send(c2g.pkg.CmdStopStreaming())
+        # wait until devices are finished deinitializing
+        await asyncio.sleep(2.0)
         await imu.disconnect()
 
 
@@ -92,7 +94,7 @@ class ImuDataPlot:
         self.gyr = np.full((self.n, 3), np.nan)
         self.acc = np.full((self.n, 3), np.nan)
         self.mag = np.full((self.n, 3), np.nan)
-        self.euler = np.full((self.n, 3), np.nan)
+        self.crank_angle = np.full(self.n, np.nan)
 
         self.create_plot()
 
@@ -128,13 +130,14 @@ class ImuDataPlot:
         self.ax[1, 0].set_xlabel('Time [s]')
         self.ax[1, 0].legend('xyz', loc='upper left')
 
-        self.ax[1, 1].set_prop_cycle('color', ['#1f77b4', '#d62728', '#2ca02c', ])  # Use BRG color cycle.
-        self.euler_lines = self.ax[1, 1].plot(self.t, self.euler)
+        # self.ax[1, 1].set_prop_cycle('color', ['#1f77b4', '#d62728', '#2ca02c', ])  # Use BRG color cycle.
+        self.crank_angle_line = self.ax[1, 1].plot(self.t, self.crank_angle)
         self.ax[1, 1].set_xlim(self.t[0], self.t[-1])
         self.ax[1, 1].set_ylim(-180, 180)
-        self.ax[1, 1].set_title('Orientation as z-x\'-y\'\' Euler angles [°]')
+        self.ax[1, 1].set_title('Crank angle [°]')
         self.ax[1, 1].set_xlabel('Time [s]')
-        self.ax[1, 1].legend(['z', 'x\'', 'y\'\''], loc='upper left')
+        # self.ax[1, 1].legend(['z', 'x\'', 'y\'\''], loc='upper left')
+        self.ax[1, 1].legend(['angle'], loc='upper left')
 
         for ax in self.ax.flatten():
             ax.grid()
@@ -149,7 +152,8 @@ class ImuDataPlot:
                 self.gyr = np.vstack([self.gyr[8:], imu_data.gyr])
                 self.acc = np.vstack([self.acc[8:], imu_data.acc])
                 self.mag = np.vstack([self.mag[8:], imu_data.mag])
-                self.euler = np.vstack([self.euler[8:], imu_data.euler])
+                # self.crank_angle = np.vstack([self.crank_angle[8:], imu_data.crank_angle])
+                self.crank_angle = np.concatenate((self.crank_angle[8:], imu_data.crank_angle))
             except queue.Empty:
                 break
 
@@ -160,10 +164,9 @@ class ImuDataPlot:
             line.set_ydata(self.acc[:, i])
         for i, line in enumerate(self.mag_lines):
             line.set_ydata(self.mag[:, i])
-        for i, line in enumerate(self.euler_lines):
-            line.set_ydata(self.euler[:, i])
+        self.crank_angle_line[0].set_ydata(self.crank_angle)
 
-        return self.gyr_lines + self.acc_lines + self.mag_lines + self.euler_lines
+        return self.gyr_lines + self.acc_lines + self.mag_lines + self.crank_angle_line
 
 
 class Stimulator:
@@ -175,7 +178,7 @@ class Stimulator:
         self.queue: queue.Queue[ImuData] = queue.Queue()
         self.current = 50
         self.last_active_muscles: set[Muscles] = {}
-        self.last_angle = 0
+        self.last_crank_angle = 0
         self.muscle_ranges = {
                 Muscles.QUADRICEPS: (0, 120),
                 Muscles.GLUTEUS_MAXIMUS: (10, 100),
@@ -208,18 +211,17 @@ class Stimulator:
             # start stimulation
             await self.update(mid_level, 0)
 
-            # stimulate for 15s
             while True:
 
-                angle = self.last_angle
+                angle = self.last_crank_angle
                 while True:
                     try:
                         imu_data = self.queue.get_nowait()
-                        angle = imu_data.euler[:-1][0][0]
+                        angle = imu_data.crank_angle[:-1][0]
                     except queue.Empty:
                         break
 
-                self.last_angle = angle
+                self.last_crank_angle = angle
                 await self.update(mid_level, angle)
 
                 # we have to call get_current_data() every 1.5s to keep stimulation ongoing
@@ -258,10 +260,10 @@ class Stimulator:
             await mid_level.update(cc)
 
 
-def main():
+async def main():
     """Main function"""
     parser = argparse.ArgumentParser(description='Example for real-time streaming of IMU orientations.')
-    parser.add_argument('imu_device', help='IMU device name ("IMU_*" or "usb)')
+    parser.add_argument('imu_device', help='IMU device name ("IMU_*" or "usb/COM*")')
     parser.add_argument('sciencemode_device', help='ScienceMode device name ("COM*")')
     args = parser.parse_args()
 
@@ -295,11 +297,8 @@ def main():
     for task in asyncio.all_tasks(hw_loop):
         hw_loop.call_soon_threadsafe(task.cancel)
 
-    # wait until devices are finished deinitializing
-    asyncio.sleep(2.0)
-
     hw_thread.join(timeout=2.0)
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())

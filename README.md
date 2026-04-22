@@ -23,9 +23,11 @@ For P24 device:
 - Stop stimulation
 - Disconnect
 
-This examples expects a cyclic movement of the imu. The sensor must be attached to the 
-bicycle crank to have enough rotation around the sensor itself.
+This examples expects a cyclic movement of the imu. The sensor must be attached to the bicycle crank to have enough rotation around the sensor itself.
 
 ## Hints
 - Adjust command line parameters name/port for both devices depending on your setup
-- run live_plot_example.py
+- minimal_example.py
+  - Minimal example how IMU and stimulator work together
+- live_plot_example.py
+  - Extended example with display of measurement data and crank angle

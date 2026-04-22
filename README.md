@@ -1,0 +1,33 @@
+# Example how to use Capture2Go imu and ScienceMode4 python lib together
+
+## Introduction
+
+Provides an example how to use SensorStim Capture2Go sensor (https://www.capture2go.com, https://github.com/sensorstim/capture2go_sdk)
+in combination with a Hasomed Science ScienceMode4 stimulator (https://hasomedscience.de/, https://github.com/ScienceMode).
+
+This example uses data from a Capture2Go device to adjust stimulation parameters of P24.
+
+For Capture2Go device:
+- Connect to device
+- Set measurement mode
+- Start streaming
+- Processing data
+  - Calculate angle of cyclic movement
+- Stop streaming
+- Disconnect
+
+For P24 device:
+- Connect to device
+- Initialize mid level mode
+- Update stimulation parameters accoring current angle of cyclic movement
+- Stop stimulation
+- Disconnect
+
+This examples expects a cyclic movement of the imu. The sensor must be attached to the bicycle crank to have enough rotation around the sensor itself.
+
+## Hints
+- Adjust command line parameters name/port for both devices depending on your setup
+- minimal_example.py
+  - Minimal example how IMU and stimulator work together
+- live_plot_example.py
+  - Extended example with display of measurement data and crank angle

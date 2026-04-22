@@ -1,0 +1,7 @@
+[MAIN]
+max-line-length=150
+ignored-modules=capture2go,science_mode_4
+max-attributes=15
+
+[MESSAGES CONTROL]
+disable=too-few-public-methods
